@@ -2,8 +2,7 @@
 
 > **An interactive visual simulation of the 4×4 Skyscraper puzzle solver with real-time backtracking animation.**
 
-### DEMO (https://mariusdamien.github.io/Skyscraper-solver/)[https://mariusdamien.github.io/Skyscraper-solver/]
-
+### DEMO [Skyscrapers DEMO](https://mariusdamien.github.io/Skyscraper-solver/)
 
 ---
 
