@@ -3,981 +3,1133 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Skyscraper Solver — Visual Simulator</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<title>Skyscraper Solver — Interactive Backtracking Visualizer</title>
+<meta name="description" content="An interactive visual simulation of the 4×4 Skyscraper puzzle solver with real-time backtracking animation, 2D & 3D views.">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Outfit:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0a0b0f;
-    --surface: #12141c;
-    --surface-2: #1a1d2a;
-    --border: #2a2d3e;
-    --accent: #f59e0b;
-    --accent-glow: #f59e0b55;
-    --accent-2: #3b82f6;
-    --accent-2-glow: #3b82f655;
-    --text: #e8e6e3;
-    --text-dim: #6b7280;
-    --success: #10b981;
-    --error: #ef4444;
-    --building-1: #6366f1;
-    --building-2: #8b5cf6;
-    --building-3: #ec4899;
-    --building-4: #f59e0b;
-    --radius: 14px;
-  }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Sora', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* === BACKGROUND ATMOSPHERE === */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: 
-      radial-gradient(ellipse 600px 400px at 20% 20%, #6366f118 0%, transparent 70%),
-      radial-gradient(ellipse 500px 500px at 80% 70%, #f59e0b0a 0%, transparent 70%),
-      radial-gradient(ellipse 400px 300px at 50% 50%, #8b5cf60a 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .app {
-    position: relative;
-    z-index: 1;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 40px 24px 60px;
-  }
-
-  /* === HEADER === */
-  header {
-    text-align: center;
-    margin-bottom: 48px;
-  }
-
-  header .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    padding: 6px 16px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 20px;
-  }
-
-  header .badge::before {
-    content: '';
-    width: 6px; height: 6px;
-    background: var(--accent);
-    border-radius: 50%;
-    box-shadow: 0 0 8px var(--accent);
-    animation: pulse-dot 2s ease infinite;
-  }
-
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.8); }
-  }
-
-  h1 {
-    font-family: 'DM Serif Display', serif;
-    font-size: clamp(36px, 5vw, 56px);
-    font-weight: 400;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    background: linear-gradient(135deg, var(--text) 0%, var(--text-dim) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  header p {
-    color: var(--text-dim);
-    font-size: 15px;
-    margin-top: 12px;
-    font-weight: 300;
-  }
-
-  /* === MAIN LAYOUT === */
-  .main-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 32px;
-    align-items: start;
-  }
-
-  @media (max-width: 800px) {
-    .main-grid { grid-template-columns: 1fr; }
-  }
-
-  /* === CARD STYLE === */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-
-  .card-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .card-header h2 {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-dim);
-  }
-
-  .card-body { padding: 24px; }
-
-  /* === INPUT SECTION === */
-  .input-section {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .input-row {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-  }
-
-  .input-row input {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 15px;
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-
-  .input-row input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-glow);
-  }
-
-  .input-row input::placeholder {
-    color: var(--text-dim);
-    font-size: 13px;
-  }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 14px 28px;
-    border-radius: 10px;
-    font-family: 'Sora', sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
-    transition: all 0.2s;
-    white-space: nowrap;
-  }
-
-  .btn-primary {
-    background: var(--accent);
-    color: #000;
-    box-shadow: 0 2px 12px var(--accent-glow);
-  }
-  .btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 20px var(--accent-glow);
-  }
-
-  .btn-secondary {
-    background: var(--surface-2);
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
-  .btn-secondary:hover {
-    background: var(--border);
-  }
-
-  .btn-sm {
-    padding: 8px 14px;
-    font-size: 12px;
-    border-radius: 8px;
-  }
-
-  .presets {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 4px;
-  }
-
-  .presets span {
-    font-size: 12px;
-    color: var(--text-dim);
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    width: 100%;
-    margin-bottom: 2px;
-  }
-
-  /* === STATS === */
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-top: 16px;
-  }
-
-  .stat-box {
-    background: var(--bg);
-    border-radius: 10px;
-    padding: 14px;
-    text-align: center;
-  }
-
-  .stat-box .label {
-    font-size: 11px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: 600;
-  }
-
-  .stat-box .value {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 22px;
-    font-weight: 700;
-    margin-top: 4px;
-    color: var(--accent);
-  }
-
-  /* === GRID VISUALIZATION === */
-  .grid-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-  }
-
-  .grid-container {
-    display: grid;
-    grid-template-columns: 48px repeat(4, 80px) 48px;
-    grid-template-rows: 48px repeat(4, 80px) 48px;
-    gap: 0;
-    position: relative;
-  }
-
-  @media (max-width: 500px) {
-    .grid-container {
-      grid-template-columns: 36px repeat(4, 60px) 36px;
-      grid-template-rows: 36px repeat(4, 60px) 36px;
-    }
-  }
-
-  .clue-cell {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--accent);
-    opacity: 0.8;
-  }
-
-  .clue-cell.top { align-items: flex-end; padding-bottom: 8px; }
-  .clue-cell.bottom { align-items: flex-start; padding-top: 8px; }
-  .clue-cell.left { justify-content: flex-end; padding-right: 8px; }
-  .clue-cell.right { justify-content: flex-start; padding-left: 8px; }
-
-  .grid-cell {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-    overflow: hidden;
-  }
-
-  .grid-cell.active {
-    border-color: var(--accent);
-    box-shadow: 0 0 16px var(--accent-glow), inset 0 0 20px rgba(245, 158, 11, 0.05);
-    z-index: 2;
-  }
-
-  .grid-cell.placed {
-    animation: cell-place 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  }
-
-  .grid-cell.backtrack {
-    animation: cell-backtrack 0.25s ease forwards;
-  }
-
-  @keyframes cell-place {
-    0% { transform: scale(0.7); opacity: 0.5; }
-    100% { transform: scale(1); opacity: 1; }
-  }
-
-  @keyframes cell-backtrack {
-    0% { background: rgba(239, 68, 68, 0.15); }
-    100% { background: var(--surface-2); }
-  }
-
-  .grid-cell .number {
-    font-family: 'DM Serif Display', serif;
-    font-size: 32px;
-    font-weight: 400;
-    transition: all 0.3s;
-  }
-
-  @media (max-width: 500px) {
-    .grid-cell .number { font-size: 24px; }
-  }
-
-  .grid-cell .number[data-val="1"] { color: var(--building-1); }
-  .grid-cell .number[data-val="2"] { color: var(--building-2); }
-  .grid-cell .number[data-val="3"] { color: var(--building-3); }
-  .grid-cell .number[data-val="4"] { color: var(--building-4); }
-
-  /* Building bars inside cells */
-  .grid-cell .building-bar {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    border-radius: 4px 4px 0 0;
-    transition: height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    opacity: 0.15;
-    width: 50%;
-  }
-
-  .grid-cell[data-height="1"] .building-bar { height: 25%; background: var(--building-1); }
-  .grid-cell[data-height="2"] .building-bar { height: 50%; background: var(--building-2); }
-  .grid-cell[data-height="3"] .building-bar { height: 75%; background: var(--building-3); }
-  .grid-cell[data-height="4"] .building-bar { height: 100%; background: var(--building-4); }
-
-  .corner-cell { /* empty corners */ }
-
-  /* === 3D SKYLINE === */
-  .skyline-card { grid-column: 1 / -1; }
-
-  .skyline-container {
-    width: 100%;
-    height: 260px;
-    position: relative;
-    background: linear-gradient(180deg, #0d0f18 0%, #151829 100%);
-    border-radius: 10px;
-    overflow: hidden;
-  }
-
-  .skyline-container::before {
-    content: '';
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    opacity: 0.5;
-  }
-
-  .skyline-row {
-    position: absolute;
-    bottom: 20px;
-    display: flex;
-    gap: 6px;
-    align-items: flex-end;
-    transition: all 0.5s ease;
-  }
-
-  .skyline-building {
-    width: 28px;
-    border-radius: 4px 4px 0 0;
-    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-    position: relative;
-  }
-
-  .skyline-building::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: rgba(255,255,255,0.3);
-    border-radius: 4px 4px 0 0;
-  }
-
-  .skyline-label {
-    position: absolute;
-    bottom: 4px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--text-dim);
-    font-weight: 600;
-  }
-
-  /* === SPEED CONTROL === */
-  .speed-control {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 16px;
-  }
-
-  .speed-control label {
-    font-size: 12px;
-    color: var(--text-dim);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    white-space: nowrap;
-  }
-
-  .speed-control input[type="range"] {
-    flex: 1;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    outline: none;
-  }
-
-  .speed-control input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
-    background: var(--accent);
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 0 8px var(--accent-glow);
-  }
-
-  .speed-value {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    color: var(--accent);
-    min-width: 50px;
-    text-align: right;
-  }
-
-  /* === LOG === */
-  .log-container {
-    max-height: 200px;
-    overflow-y: auto;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    line-height: 1.8;
-    color: var(--text-dim);
-    background: var(--bg);
-    border-radius: 10px;
-    padding: 14px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
-  }
-
-  .log-container::-webkit-scrollbar { width: 6px; }
-  .log-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-  .log-entry { display: flex; gap: 8px; }
-  .log-entry .step-num { color: var(--accent); min-width: 40px; text-align: right; }
-  .log-entry.backtrack { color: var(--error); opacity: 0.7; }
-  .log-entry.success { color: var(--success); }
-
-  /* === STATUS BAR === */
-  .status-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    background: var(--bg);
-    border-radius: 8px;
-    margin-bottom: 16px;
-    font-size: 13px;
-  }
-
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--text-dim);
-  }
-  .status-dot.solving {
-    background: var(--accent);
-    animation: pulse-dot 1s ease infinite;
-  }
-  .status-dot.solved {
-    background: var(--success);
-    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
-  }
-  .status-dot.error {
-    background: var(--error);
-  }
-
-  .fade-in {
-    animation: fadeIn 0.5s ease forwards;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060709;--bg2:#0b0d12;--surface:#10121a;--surface2:#161923;--surface3:#1c1f2e;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.1);
+  --accent:#e8a525;--accent-dim:#e8a52544;--accent-bright:#fbbf24;
+  --blue:#5b7bf7;--blue-dim:#5b7bf744;
+  --violet:#8b5cf6;--pink:#ec4899;--emerald:#10b981;--red:#ef4444;
+  --text:#eae8e4;--text2:#b0aead;--text3:#6b6f80;
+  --font-display:'Playfair Display',Georgia,serif;
+  --font-body:'Outfit',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --b1:#5b7bf7;--b2:#8b5cf6;--b3:#ec4899;--b4:#e8a525;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* ========== SCROLLBAR ========== */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px}
+
+/* ========== NAVIGATION ========== */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  padding:0 40px;height:64px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(6,7,9,0.8);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  transition:all 0.3s;
+}
+nav.scrolled{background:rgba(6,7,9,0.95);box-shadow:0 4px 30px rgba(0,0,0,0.3)}
+.nav-logo{
+  font-family:var(--font-display);font-size:20px;font-weight:700;
+  color:var(--text);text-decoration:none;display:flex;align-items:center;gap:10px;
+}
+.nav-logo .mark{
+  width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--pink));
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:14px;font-weight:700;color:#000;
+}
+.nav-links{display:flex;gap:6px;align-items:center}
+.nav-links a{
+  color:var(--text3);text-decoration:none;font-size:14px;font-weight:500;
+  padding:8px 16px;border-radius:8px;transition:all 0.25s;letter-spacing:0.01em;
+}
+.nav-links a:hover,.nav-links a.active{color:var(--text);background:var(--surface2)}
+.nav-links a.active{color:var(--accent)}
+
+.hamburger{display:none;background:none;border:none;color:var(--text);font-size:24px;cursor:pointer}
+
+@media(max-width:768px){
+  .nav-links{
+    position:fixed;top:64px;left:0;right:0;
+    background:var(--bg2);border-bottom:1px solid var(--border);
+    flex-direction:column;padding:16px;gap:4px;
+    transform:translateY(-110%);transition:transform 0.3s;
+  }
+  .nav-links.open{transform:translateY(0)}
+  .nav-links a{width:100%;padding:12px 16px}
+  .hamburger{display:block}
+}
+
+/* ========== PAGE SYSTEM ========== */
+.page{display:none;min-height:100vh;padding-top:64px}
+.page.active{display:block}
+
+/* ========== HERO ========== */
+.hero{
+  min-height:calc(100vh - 64px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:60px 24px;
+  position:relative;overflow:hidden;
+}
+
+.hero-bg{
+  position:absolute;inset:0;z-index:0;
+  background:
+    radial-gradient(ellipse 800px 600px at 30% 40%,rgba(91,123,247,0.08),transparent 70%),
+    radial-gradient(ellipse 600px 500px at 70% 60%,rgba(232,165,37,0.06),transparent 70%),
+    radial-gradient(ellipse 500px 400px at 50% 80%,rgba(139,92,246,0.05),transparent 70%);
+}
+
+/* Animated city skyline in hero */
+.hero-skyline{
+  position:absolute;bottom:0;left:0;right:0;height:220px;z-index:0;
+  display:flex;align-items:flex-end;justify-content:center;gap:4px;
+  opacity:0.15;overflow:hidden;
+}
+.hero-skyline .bldg{
+  width:24px;border-radius:3px 3px 0 0;
+  animation:heroRise 1.5s cubic-bezier(0.34,1.56,0.64,1) backwards;
+}
+@keyframes heroRise{from{height:0!important;opacity:0}to{opacity:1}}
+
+.hero-content{position:relative;z-index:1;max-width:800px}
+
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid var(--border2);border-radius:100px;
+  padding:8px 20px;font-size:13px;font-weight:500;color:var(--accent);
+  margin-bottom:28px;
+  animation:fadeUp 0.8s ease backwards;
+}
+.hero-badge::before{
+  content:'';width:6px;height:6px;background:var(--accent);border-radius:50%;
+  box-shadow:0 0 10px var(--accent);animation:blink 2s ease infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+
+.hero h1{
+  font-family:var(--font-display);font-size:clamp(42px,7vw,80px);
+  font-weight:900;line-height:1.05;letter-spacing:-0.03em;
+  animation:fadeUp 0.8s ease 0.1s backwards;
+}
+.hero h1 .gradient{
+  background:linear-gradient(135deg,var(--accent-bright) 0%,var(--pink) 50%,var(--violet) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero p{
+  font-size:clamp(16px,2vw,20px);color:var(--text2);
+  max-width:560px;margin:20px auto 0;line-height:1.6;font-weight:300;
+  animation:fadeUp 0.8s ease 0.2s backwards;
+}
+
+.hero-actions{
+  display:flex;gap:14px;justify-content:center;margin-top:36px;flex-wrap:wrap;
+  animation:fadeUp 0.8s ease 0.3s backwards;
+}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+.btn{
+  display:inline-flex;align-items:center;gap:8px;padding:14px 28px;
+  border-radius:12px;font-family:var(--font-body);font-size:15px;font-weight:600;
+  cursor:pointer;border:none;transition:all 0.25s;text-decoration:none;
+}
+.btn-primary{
+  background:var(--accent);color:#000;
+  box-shadow:0 2px 20px var(--accent-dim);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 30px var(--accent-dim)}
+.btn-outline{
+  background:transparent;color:var(--text);border:1px solid var(--border2);
+}
+.btn-outline:hover{background:var(--surface2);border-color:var(--text3)}
+.btn-sm{padding:9px 18px;font-size:13px;border-radius:9px}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--surface3)}
+
+/* Feature cards on hero */
+.hero-features{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:16px;
+  margin-top:60px;max-width:700px;width:100%;
+  animation:fadeUp 0.8s ease 0.4s backwards;
+}
+@media(max-width:600px){.hero-features{grid-template-columns:1fr}}
+.feature-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:24px 20px;text-align:left;transition:all 0.3s;
+}
+.feature-card:hover{border-color:var(--border2);transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,0,0,0.3)}
+.feature-card .icon{font-size:28px;margin-bottom:12px}
+.feature-card h3{font-size:15px;font-weight:600;margin-bottom:6px}
+.feature-card p{font-size:13px;color:var(--text3);line-height:1.5}
+
+/* ========== SECTION STYLE ========== */
+.section{padding:80px 24px;max-width:1200px;margin:0 auto}
+.section-header{text-align:center;margin-bottom:48px}
+.section-header h2{
+  font-family:var(--font-display);font-size:clamp(28px,4vw,44px);
+  font-weight:700;letter-spacing:-0.02em;
+}
+.section-header p{color:var(--text3);font-size:16px;margin-top:10px;max-width:500px;margin-inline:auto}
+
+/* ========== SOLVER PAGE (2D) ========== */
+.solver-layout{
+  display:grid;grid-template-columns:320px 1fr;gap:28px;align-items:start;
+  max-width:1100px;margin:0 auto;padding:32px 24px;
+}
+@media(max-width:900px){.solver-layout{grid-template-columns:1fr}}
+
+.panel{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;
+}
+.panel-head{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  font-family:var(--font-mono);font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.1em;color:var(--text3);
+  display:flex;align-items:center;gap:8px;
+}
+.panel-body{padding:18px 20px}
+
+.input-field{
+  width:100%;background:var(--bg);border:1px solid var(--border);
+  border-radius:10px;padding:13px 15px;
+  font-family:var(--font-mono);font-size:13px;color:var(--text);
+  outline:none;transition:border-color 0.2s,box-shadow 0.2s;
+}
+.input-field:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.input-field::placeholder{color:var(--text3);font-size:12px}
+
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+
+.stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}
+.stat{background:var(--bg);border-radius:10px;padding:14px;text-align:center}
+.stat .lab{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-weight:600}
+.stat .val{font-family:var(--font-mono);font-size:22px;font-weight:700;margin-top:4px}
+
+.log-box{
+  max-height:180px;overflow-y:auto;font-family:var(--font-mono);font-size:11px;
+  line-height:1.7;color:var(--text3);background:var(--bg);border-radius:10px;padding:12px;
+}
+.log-box::-webkit-scrollbar{width:4px}
+.log-box::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+.log-entry{display:flex;gap:6px}
+.log-entry .n{color:var(--accent);min-width:36px;text-align:right}
+.log-entry.back{color:var(--red);opacity:0.7}
+.log-entry.ok{color:var(--emerald)}
+
+.speed-row{display:flex;align-items:center;gap:10px;margin-top:14px}
+.speed-row label{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap}
+.speed-row input[type="range"]{
+  flex:1;-webkit-appearance:none;height:3px;background:var(--border2);
+  border-radius:2px;outline:none;
+}
+.speed-row input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;background:var(--accent);
+  border-radius:50%;cursor:pointer;box-shadow:0 0 8px var(--accent-dim);
+}
+.speed-val{font-family:var(--font-mono);font-size:12px;color:var(--accent);min-width:40px;text-align:right}
+
+.status-pill{
+  display:flex;align-items:center;gap:8px;font-size:12px;
+  background:var(--bg);border-radius:100px;padding:6px 14px;
+}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.status-dot.solving{background:var(--accent);animation:blink 1.2s ease infinite}
+.status-dot.solved{background:var(--emerald);box-shadow:0 0 10px rgba(16,185,129,0.5)}
+.status-dot.error{background:var(--red)}
+
+/* 2D GRID */
+.grid-center{display:flex;flex-direction:column;align-items:center;gap:24px}
+.grid-container{
+  display:grid;
+  grid-template-columns:44px repeat(4,76px) 44px;
+  grid-template-rows:44px repeat(4,76px) 44px;
+  gap:0;
+}
+@media(max-width:500px){
+  .grid-container{grid-template-columns:32px repeat(4,56px) 32px;grid-template-rows:32px repeat(4,56px) 32px}
+}
+.clue-cell{
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:17px;font-weight:700;color:var(--accent);opacity:0.7;
+}
+.clue-cell.top{align-items:flex-end;padding-bottom:6px}
+.clue-cell.bottom{align-items:flex-start;padding-top:6px}
+.clue-cell.left{justify-content:flex-end;padding-right:8px}
+.clue-cell.right{justify-content:flex-start;padding-left:8px}
+
+.grid-cell{
+  background:var(--surface2);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+  transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.grid-cell.active{border-color:var(--accent);box-shadow:0 0 16px var(--accent-dim),inset 0 0 20px rgba(232,165,37,0.04);z-index:2}
+.grid-cell.placed{animation:cellIn 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards}
+.grid-cell.backtrack{animation:cellOut 0.2s ease forwards}
+@keyframes cellIn{0%{transform:scale(0.7);opacity:0.5}100%{transform:scale(1);opacity:1}}
+@keyframes cellOut{0%{background:rgba(239,68,68,0.12)}100%{background:var(--surface2)}}
+
+.grid-cell .number{
+  font-family:var(--font-display);font-size:30px;font-weight:700;transition:all 0.3s;
+}
+@media(max-width:500px){.grid-cell .number{font-size:22px}}
+.grid-cell .number[data-val="1"]{color:var(--b1)}
+.grid-cell .number[data-val="2"]{color:var(--b2)}
+.grid-cell .number[data-val="3"]{color:var(--b3)}
+.grid-cell .number[data-val="4"]{color:var(--b4)}
+
+.grid-cell .bar{
+  position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  border-radius:3px 3px 0 0;width:50%;opacity:0.12;transition:height 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.grid-cell[data-h="1"] .bar{height:25%;background:var(--b1)}
+.grid-cell[data-h="2"] .bar{height:50%;background:var(--b2)}
+.grid-cell[data-h="3"] .bar{height:75%;background:var(--b3)}
+.grid-cell[data-h="4"] .bar{height:100%;background:var(--b4)}
+
+/* Skyline mini */
+.skyline-mini{
+  width:100%;height:200px;background:linear-gradient(180deg,var(--bg) 0%,var(--surface) 100%);
+  border-radius:12px;position:relative;overflow:hidden;
+}
+.skyline-mini::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0.4;
+}
+.sky-row{position:absolute;bottom:16px;display:flex;gap:5px;align-items:flex-end}
+.sky-bldg{
+  width:22px;border-radius:3px 3px 0 0;transition:all 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  position:relative;
+}
+.sky-bldg::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:rgba(255,255,255,0.25);border-radius:3px 3px 0 0}
+.sky-label{position:absolute;bottom:2px;font-family:var(--font-mono);font-size:9px;color:var(--text3);font-weight:600}
+
+/* ========== 3D PAGE ========== */
+#canvas3d{width:100%;height:calc(100vh - 64px);display:block;border-radius:0}
+.three-overlay{
+  position:absolute;z-index:10;pointer-events:none;
+}
+.three-overlay>*{pointer-events:auto}
+.three-controls{
+  position:absolute;top:16px;left:16px;
+  display:flex;flex-direction:column;gap:12px;
+}
+.three-status{
+  position:absolute;top:16px;right:16px;
+}
+.three-cam{
+  position:absolute;bottom:16px;right:16px;
+  display:flex;gap:6px;
+}
+.three-wrapper{position:relative;height:calc(100vh - 64px);background:var(--bg)}
+
+/* ========== ALGORITHM PAGE ========== */
+.algo-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:24px;
+  max-width:900px;margin:0 auto;
+}
+@media(max-width:700px){.algo-grid{grid-template-columns:1fr}}
+
+.step-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:32px 28px;position:relative;overflow:hidden;
+  transition:all 0.3s;
+}
+.step-card:hover{border-color:var(--border2);transform:translateY(-2px)}
+.step-card .step-num{
+  font-family:var(--font-display);font-size:48px;font-weight:900;
+  position:absolute;top:16px;right:20px;
+  opacity:0.06;line-height:1;
+}
+.step-card h3{font-size:18px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.step-card h3 .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.step-card p{font-size:14px;color:var(--text2);line-height:1.7}
+.step-card code{
+  font-family:var(--font-mono);font-size:12px;
+  background:var(--bg);padding:2px 8px;border-radius:5px;color:var(--accent);
+}
+
+/* Complexity viz */
+.complexity-bar{
+  margin-top:48px;max-width:600px;margin-inline:auto;
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:32px;
+}
+.cx-row{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.cx-row:last-child{margin-bottom:0}
+.cx-label{font-family:var(--font-mono);font-size:12px;color:var(--text3);min-width:90px;text-align:right}
+.cx-track{flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.cx-fill{height:100%;border-radius:4px;transition:width 1.5s cubic-bezier(0.4,0,0.2,1)}
+.cx-val{font-family:var(--font-mono);font-size:12px;color:var(--text2);min-width:50px}
+
+/* ========== ABOUT PAGE ========== */
+.about-hero{
+  text-align:center;padding:80px 24px 40px;
+}
+.about-hero .avatar{
+  width:120px;height:120px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--violet),var(--pink));
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 24px;
+  font-family:var(--font-display);font-size:42px;font-weight:900;color:#000;
+}
+.about-hero h2{font-family:var(--font-display);font-size:36px;font-weight:700}
+.about-hero p{color:var(--text3);font-size:16px;margin-top:8px}
+
+.about-links{
+  display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap;
+}
+
+.tech-stack{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;
+  max-width:700px;margin:40px auto 0;
+}
+.tech-item{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:20px;text-align:center;transition:all 0.3s;
+}
+.tech-item:hover{border-color:var(--border2);transform:translateY(-2px)}
+.tech-item .t-icon{font-size:28px;margin-bottom:8px}
+.tech-item h4{font-size:14px;font-weight:600}
+.tech-item p{font-size:12px;color:var(--text3);margin-top:4px}
+
+/* ========== FOOTER ========== */
+footer{
+  border-top:1px solid var(--border);
+  padding:32px 24px;text-align:center;
+  font-size:13px;color:var(--text3);
+}
+footer a{color:var(--accent);text-decoration:none}
+footer a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
 
-<div class="app">
-  <header>
-    <div class="badge">Skyscraper Puzzle</div>
-    <h1>Skyscraper Solver</h1>
-    <p>Visual backtracking simulation — 4×4 Skyscraper Puzzle</p>
-  </header>
+<!-- ========== NAVIGATION ========== -->
+<nav id="navbar">
+  <a href="#" class="nav-logo" onclick="goTo('home')">
+    <div class="mark">SK</div>
+    Skyscraper
+  </a>
+  <button class="hamburger" onclick="toggleMenu()" id="menuBtn">☰</button>
+  <div class="nav-links" id="navLinks">
+    <a href="#" onclick="goTo('home')" data-page="home">Home</a>
+    <a href="#" onclick="goTo('solver2d')" data-page="solver2d">2D Solver</a>
+    <a href="#" onclick="goTo('solver3d')" data-page="solver3d">3D Solver</a>
+    <a href="#" onclick="goTo('algorithm')" data-page="algorithm">Algorithm</a>
+    <a href="#" onclick="goTo('about')" data-page="about">About</a>
+  </div>
+</nav>
 
-  <div class="main-grid">
-    <!-- LEFT: Controls -->
-    <div style="display:flex;flex-direction:column;gap:24px;">
-      <div class="card">
-        <div class="card-header">
-          <h2>⚡ Input</h2>
-        </div>
-        <div class="card-body input-section">
-          <div class="input-row">
-            <input type="text" id="clueInput" placeholder="4 3 2 1 1 2 2 2 4 3 2 1 1 2 2 2" value="4 3 2 1 1 2 2 2 4 3 2 1 1 2 2 2" />
-          </div>
-          <div style="display:flex;gap:10px;">
-            <button class="btn btn-primary" id="btnSolve" onclick="startSolve()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              Solve
-            </button>
-            <button class="btn btn-secondary" id="btnReset" onclick="resetAll()">Reset</button>
-          </div>
-          <div class="presets">
-            <span>Presets:</span>
-            <button class="btn btn-secondary btn-sm" onclick="setPreset('4 3 2 1 1 2 2 2 4 3 2 1 1 2 2 2')">Classic</button>
-            <button class="btn btn-secondary btn-sm" onclick="setPreset('1 2 3 4 4 3 2 1 1 2 3 4 4 3 2 1')">Mirror</button>
-            <button class="btn btn-secondary btn-sm" onclick="setPreset('2 1 3 2 3 2 1 2 2 3 1 2 2 1 3 2')">Medium</button>
-            <button class="btn btn-secondary btn-sm" onclick="setPreset('1 2 2 2 2 2 2 1 1 2 2 2 2 2 2 1')">Open</button>
-          </div>
-          <div class="speed-control">
-            <label>Speed</label>
-            <input type="range" id="speedSlider" min="1" max="100" value="60" oninput="updateSpeed()">
-            <span class="speed-value" id="speedValue">60ms</span>
-          </div>
-        </div>
+<!-- ========== PAGE: HOME ========== -->
+<div class="page active" id="page-home">
+  <div class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-skyline" id="heroSkyline"></div>
+    <div class="hero-content">
+      <div class="hero-badge">Interactive Visualizer</div>
+      <h1>See the <span class="gradient">Algorithm</span> Think</h1>
+      <p>Watch a backtracking solver tackle the 4×4 Skyscraper puzzle in real time — step by step, in 2D and 3D.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" onclick="goTo('solver2d')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Launch 2D Solver
+        </button>
+        <button class="btn btn-outline" onclick="goTo('solver3d')">
+          Explore 3D
+        </button>
       </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h2>📊 Statistics</h2>
+      <div class="hero-features">
+        <div class="feature-card">
+          <div class="icon">🔍</div>
+          <h3>Step-by-Step</h3>
+          <p>Watch every placement and backtrack as it happens in real time.</p>
         </div>
-        <div class="card-body">
-          <div class="stats">
-            <div class="stat-box">
-              <div class="label">Steps</div>
-              <div class="value" id="statSteps">0</div>
-            </div>
-            <div class="stat-box">
-              <div class="label">Backtracks</div>
-              <div class="value" id="statBacks" style="color:var(--error)">0</div>
-            </div>
-            <div class="stat-box">
-              <div class="label">Time</div>
-              <div class="value" id="statTime" style="color:var(--accent-2)">0s</div>
-            </div>
-          </div>
+        <div class="feature-card">
+          <div class="icon">🏙️</div>
+          <h3>3D Cityscape</h3>
+          <p>Buildings rise and fall in a Three.js powered 3D scene you can orbit.</p>
         </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h2>📜 Log</h2>
-        </div>
-        <div class="card-body">
-          <div class="log-container" id="logContainer">
-            <div style="color:var(--text-dim);opacity:0.5;">Waiting...</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- RIGHT: Grid + Skyline -->
-    <div style="display:flex;flex-direction:column;gap:24px;">
-      <div class="card">
-        <div class="card-header">
-          <h2>🏙️ Grid</h2>
-          <div class="status-bar" style="margin:0;padding:6px 12px;">
-            <div class="status-dot" id="statusDot"></div>
-            <span id="statusText" style="font-size:12px;color:var(--text-dim);">Ready</span>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="grid-wrapper">
-            <div class="grid-container" id="gridContainer"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card skyline-card">
-        <div class="card-header">
-          <h2>🌆 Skyline View</h2>
-        </div>
-        <div class="card-body" style="padding:0;">
-          <div class="skyline-container" id="skylineContainer"></div>
+        <div class="feature-card">
+          <div class="icon">⚡</div>
+          <h3>Adjustable Speed</h3>
+          <p>From slow-motion analysis to instant solve — control the pace.</p>
         </div>
       </div>
     </div>
   </div>
 </div>
 
+<!-- ========== PAGE: 2D SOLVER ========== -->
+<div class="page" id="page-solver2d">
+  <div class="solver-layout">
+    <!-- Controls -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="panel">
+        <div class="panel-head">⚡ Input</div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:12px">
+          <input class="input-field" type="text" id="clueInput2d" value="4 3 2 1 1 2 2 2 4 3 2 1 1 2 2 2" placeholder="16 clues (digits 1-4)">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" id="btnSolve2d" onclick="startSolve2d()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Solve
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="reset2d()">Reset</button>
+          </div>
+          <div class="presets">
+            <button class="btn btn-ghost btn-sm" onclick="setP2d('4 3 2 1 1 2 2 2 4 3 2 1 1 2 2 2')">Classic</button>
+            <button class="btn btn-ghost btn-sm" onclick="setP2d('1 2 3 4 4 3 2 1 1 2 3 4 4 3 2 1')">Mirror</button>
+            <button class="btn btn-ghost btn-sm" onclick="setP2d('2 1 3 2 3 2 1 2 2 3 1 2 2 1 3 2')">Medium</button>
+            <button class="btn btn-ghost btn-sm" onclick="setP2d('1 2 2 2 2 2 2 1 1 2 2 2 2 2 2 1')">Open</button>
+          </div>
+          <div class="speed-row">
+            <label>Speed</label>
+            <input type="range" id="speed2d" min="1" max="100" value="70" oninput="updateSpeed2d()">
+            <span class="speed-val" id="speedVal2d">31ms</span>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">📊 Statistics</div>
+        <div class="panel-body">
+          <div class="stats-grid">
+            <div class="stat"><div class="lab">Steps</div><div class="val" id="s2dSteps" style="color:var(--accent)">0</div></div>
+            <div class="stat"><div class="lab">Backtracks</div><div class="val" id="s2dBacks" style="color:var(--red)">0</div></div>
+            <div class="stat"><div class="lab">Time</div><div class="val" id="s2dTime" style="color:var(--blue)">0s</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">📜 Log</div>
+        <div class="panel-body" style="padding:10px">
+          <div class="log-box" id="log2d"><span style="opacity:.4">Waiting...</span></div>
+        </div>
+      </div>
+    </div>
+    <!-- Grid -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="panel">
+        <div class="panel-head">
+          <span>🏙️ Grid</span>
+          <div style="margin-left:auto">
+            <div class="status-pill">
+              <div class="status-dot" id="sd2d"></div>
+              <span id="st2d">Ready</span>
+            </div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="grid-center">
+            <div class="grid-container" id="grid2d"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">🌆 Skyline View</div>
+        <div class="panel-body" style="padding:0 0 0 0">
+          <div class="skyline-mini" id="skyline2d"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE: 3D SOLVER ========== -->
+<div class="page" id="page-solver3d">
+  <div class="three-wrapper" id="threeWrapper">
+    <canvas id="canvas3d"></canvas>
+    <!-- Overlays -->
+    <div class="three-controls three-overlay">
+      <div class="panel" style="width:280px">
+        <div class="panel-head">⚡ 3D Solver</div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:10px">
+          <input class="input-field" type="text" id="clueInput3d" value="4 3 2 1 1 2 2 2 4 3 2 1 1 2 2 2" placeholder="16 clues">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" id="btnSolve3d" onclick="startSolve3d()">Solve</button>
+            <button class="btn btn-ghost btn-sm" onclick="reset3d()">Reset</button>
+          </div>
+          <div class="presets">
+            <button class="btn btn-ghost btn-sm" onclick="setP3d('4 3 2 1 1 2 2 2 4 3 2 1 1 2 2 2')">Classic</button>
+            <button class="btn btn-ghost btn-sm" onclick="setP3d('2 1 3 2 3 2 1 2 2 3 1 2 2 1 3 2')">Medium</button>
+          </div>
+          <div class="speed-row">
+            <label>Speed</label>
+            <input type="range" id="speed3d" min="1" max="100" value="70" oninput="updateSpeed3d()">
+            <span class="speed-val" id="speedVal3d">31ms</span>
+          </div>
+          <div class="stats-grid" style="margin-top:6px">
+            <div class="stat"><div class="lab">Steps</div><div class="val" id="s3dSteps" style="color:var(--accent);font-size:16px">0</div></div>
+            <div class="stat"><div class="lab">Back</div><div class="val" id="s3dBacks" style="color:var(--red);font-size:16px">0</div></div>
+            <div class="stat"><div class="lab">Time</div><div class="val" id="s3dTime" style="color:var(--blue);font-size:16px">0s</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="three-status three-overlay">
+      <div class="status-pill" style="background:var(--surface)">
+        <div class="status-dot" id="sd3d"></div>
+        <span id="st3d">Ready</span>
+      </div>
+    </div>
+    <div class="three-cam three-overlay">
+      <button class="btn btn-ghost btn-sm" onclick="setCam3d('persp')">Perspective</button>
+      <button class="btn btn-ghost btn-sm" onclick="setCam3d('top')">Top</button>
+      <button class="btn btn-ghost btn-sm" onclick="setCam3d('front')">Front</button>
+      <button class="btn btn-ghost btn-sm" onclick="setCam3d('iso')">Isometric</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE: ALGORITHM ========== -->
+<div class="page" id="page-algorithm">
+  <div class="section">
+    <div class="section-header">
+      <h2>How the Solver Works</h2>
+      <p>A deep dive into the backtracking algorithm behind the Skyscraper puzzle.</p>
+    </div>
+    <div class="algo-grid">
+      <div class="step-card">
+        <div class="step-num">01</div>
+        <h3><span class="dot" style="background:var(--blue)"></span> Parse Input</h3>
+        <p>The solver reads 16 visibility clues from the input string. Each clue (1–4) tells how many buildings are visible from that direction. They are stored as: <code>top[0-3]</code>, <code>bottom[4-7]</code>, <code>left[8-11]</code>, <code>right[12-15]</code>.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">02</div>
+        <h3><span class="dot" style="background:var(--violet)"></span> Try a Value</h3>
+        <p>Starting at position 0, the solver tries placing values 1 through 4. Before placing, it checks the <strong>uniqueness constraint</strong>: no duplicate in the same row or column.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">03</div>
+        <h3><span class="dot" style="background:var(--pink)"></span> Check Clues</h3>
+        <p>When a row or column is fully filled, the solver computes visibility from both ends and compares against the clues. A <strong>visible building</strong> is one taller than all buildings before it.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">04</div>
+        <h3><span class="dot" style="background:var(--accent)"></span> Backtrack</h3>
+        <p>If a contradiction is found — wrong visibility count or no valid value for a cell — the solver <strong>erases</strong> the last placement and tries the next value. This is the heart of backtracking.</p>
+      </div>
+    </div>
+
+    <!-- Visibility example -->
+    <div style="max-width:700px;margin:48px auto 0;text-align:center">
+      <h3 style="font-family:var(--font-display);font-size:22px;margin-bottom:20px">Visibility Example</h3>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+        <div style="text-align:center">
+          <div style="font-family:var(--font-mono);font-size:13px;color:var(--accent);margin-bottom:8px">👁️ Seen: 2</div>
+          <div style="display:flex;gap:6px;align-items:flex-end">
+            <div style="width:48px;height:36px;background:var(--b1);border-radius:4px 4px 0 0;opacity:0.4"></div>
+            <div style="width:48px;height:108px;background:var(--b4);border-radius:4px 4px 0 0"></div>
+            <div style="width:48px;height:54px;background:var(--b2);border-radius:4px 4px 0 0;opacity:0.4"></div>
+            <div style="width:48px;height:72px;background:var(--b3);border-radius:4px 4px 0 0;opacity:0.4"></div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <div style="width:48px;font-family:var(--font-mono);font-size:14px;color:var(--text2)">1</div>
+            <div style="width:48px;font-family:var(--font-mono);font-size:14px;color:var(--accent);font-weight:700">4</div>
+            <div style="width:48px;font-family:var(--font-mono);font-size:14px;color:var(--text2)">2</div>
+            <div style="width:48px;font-family:var(--font-mono);font-size:14px;color:var(--text2)">3</div>
+          </div>
+        </div>
+        <div style="padding:0 24px;color:var(--text3);font-size:14px;line-height:1.7;text-align:left;max-width:300px">
+          Looking left → right:<br>
+          <strong style="color:var(--b1)">1</strong> is seen (first building).<br>
+          <strong style="color:var(--b4)">4</strong> is seen (taller than 1).<br>
+          <strong style="color:var(--b2)">2</strong> hidden behind 4.<br>
+          <strong style="color:var(--b3)">3</strong> hidden behind 4.<br>
+          <span style="color:var(--accent)">Total visible = 2</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Complexity -->
+    <div class="complexity-bar">
+      <h3 style="font-family:var(--font-display);font-size:18px;margin-bottom:20px;text-align:center">Algorithm Complexity</h3>
+      <div class="cx-row">
+        <div class="cx-label">Brute force</div>
+        <div class="cx-track"><div class="cx-fill" style="width:100%;background:var(--red)" id="cx1"></div></div>
+        <div class="cx-val">4<sup>16</sup></div>
+      </div>
+      <div class="cx-row">
+        <div class="cx-label">+ Uniqueness</div>
+        <div class="cx-track"><div class="cx-fill" style="width:35%;background:var(--accent)" id="cx2"></div></div>
+        <div class="cx-val">~24<sup>4</sup></div>
+      </div>
+      <div class="cx-row">
+        <div class="cx-label">+ Clue check</div>
+        <div class="cx-track"><div class="cx-fill" style="width:8%;background:var(--emerald)" id="cx3"></div></div>
+        <div class="cx-val">~50-200</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE: ABOUT ========== -->
+<div class="page" id="page-about">
+  <div class="about-hero">
+    <div class="avatar">MD</div>
+    <h2>Marius DAMIEN</h2>
+    <p>Developer & Creator</p>
+    <div class="about-links">
+      <a class="btn btn-outline btn-sm" href="https://github.com/MariusDamien" target="_blank">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+  <div class="section" style="padding-top:0">
+    <div class="section-header">
+      <h2>Tech Stack</h2>
+    </div>
+    <div class="tech-stack">
+      <div class="tech-item">
+        <div class="t-icon">🟡</div>
+        <h4>Vanilla JS</h4>
+        <p>Zero dependencies for the solver engine</p>
+      </div>
+      <div class="tech-item">
+        <div class="t-icon">🎨</div>
+        <h4>CSS3</h4>
+        <p>Custom properties, animations, grid layouts</p>
+      </div>
+      <div class="tech-item">
+        <div class="t-icon">🧊</div>
+        <h4>Three.js</h4>
+        <p>WebGL 3D rendering with shadows & particles</p>
+      </div>
+      <div class="tech-item">
+        <div class="t-icon">🧠</div>
+        <h4>Backtracking</h4>
+        <p>Recursive constraint-satisfaction solver</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== FOOTER ========== -->
+<footer>
+  Built by <a href="https://github.com/MariusDamien" target="_blank">Marius DAMIEN</a> · Skyscraper Solver © 2025
+</footer>
+
+<!-- ========== THREE.JS ========== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
 <script>
-// ====== STATE ======
-let grid = Array.from({length:4}, () => Array(4).fill(0));
-let clues = new Array(16).fill(0);
-let solving = false;
-let stepCount = 0;
-let backtrackCount = 0;
-let startTime = 0;
-let delay = 40;
-let animationId = null;
+// ================================================
+// NAVIGATION
+// ================================================
+function goTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  document.querySelectorAll('.nav-links a').forEach(a => {
+    a.classList.toggle('active', a.dataset.page === page);
+  });
+  document.getElementById('navLinks').classList.remove('open');
+  window.scrollTo(0, 0);
 
-// ====== INIT GRID DOM ======
-function buildGridDOM() {
-  const container = document.getElementById('gridContainer');
-  container.innerHTML = '';
+  if (page === 'solver3d' && !threeInitialized) initThree();
+  if (page === 'solver3d') resizeThree();
+}
+function toggleMenu() {
+  document.getElementById('navLinks').classList.toggle('open');
+}
+window.addEventListener('scroll', () => {
+  document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 10);
+});
 
-  // Corner top-left
-  container.appendChild(makeDiv('corner-cell'));
-
-  // Top clues
-  for (let c = 0; c < 4; c++) {
-    const d = makeDiv('clue-cell top');
-    d.id = `clue-top-${c}`;
-    d.textContent = '-';
-    container.appendChild(d);
+// ================================================
+// HERO SKYLINE
+// ================================================
+(function buildHeroSkyline() {
+  const el = document.getElementById('heroSkyline');
+  const colors = ['var(--b1)','var(--b2)','var(--b3)','var(--b4)'];
+  for (let i = 0; i < 60; i++) {
+    const d = document.createElement('div');
+    d.className = 'bldg';
+    const h = 30 + Math.random() * 170;
+    d.style.height = h + 'px';
+    d.style.background = colors[Math.floor(Math.random() * 4)];
+    d.style.animationDelay = (i * 0.04) + 's';
+    el.appendChild(d);
   }
-  // Corner top-right
-  container.appendChild(makeDiv('corner-cell'));
+})();
 
-  for (let r = 0; r < 4; r++) {
-    // Left clue
-    const lc = makeDiv('clue-cell left');
-    lc.id = `clue-left-${r}`;
-    lc.textContent = '-';
-    container.appendChild(lc);
+// ================================================
+// SOLVER CORE (shared)
+// ================================================
+function parseClues(s) {
+  const n = s.trim().split(/\s+/).map(Number);
+  return (n.length === 16 && n.every(x => x >= 1 && x <= 4)) ? n : null;
+}
+function vis(a,b,c,d){let m=0,n=0;[a,b,c,d].forEach(v=>{if(v>m){m=v;n++}});return n}
 
-    // Grid cells
-    for (let c = 0; c < 4; c++) {
-      const cell = makeDiv('grid-cell');
-      cell.id = `cell-${r}-${c}`;
-      cell.innerHTML = `<div class="building-bar"></div><span class="number" data-val="0"></span>`;
-      container.appendChild(cell);
+class Solver {
+  constructor() { this.grid=Array.from({length:4},()=>Array(4).fill(0)); this.clues=[]; }
+  init(clues) { this.clues=clues; this.grid=Array.from({length:4},()=>Array(4).fill(0)); }
+  rowHas(r,v){return this.grid[r].includes(v)}
+  colHas(c,v){return this.grid.some(row=>row[c]===v)}
+  canPlace(r,c,v){return !this.rowHas(r,v)&&!this.colHas(c,v)}
+  rowDone(r){return this.grid[r].every(v=>v>0)}
+  colDone(c){return this.grid.every(row=>row[c]>0)}
+  chkRow(r){
+    const g=this.grid,cl=this.clues;
+    return vis(g[r][0],g[r][1],g[r][2],g[r][3])===cl[8+r]&&vis(g[r][3],g[r][2],g[r][1],g[r][0])===cl[12+r];
+  }
+  chkCol(c){
+    const g=this.grid,cl=this.clues;
+    return vis(g[0][c],g[1][c],g[2][c],g[3][c])===cl[c]&&vis(g[3][c],g[2][c],g[1][c],g[0][c])===cl[4+c];
+  }
+  noContra(r,c){
+    if(this.rowDone(r)&&!this.chkRow(r))return false;
+    if(this.colDone(c)&&!this.chkCol(c))return false;
+    return true;
+  }
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+// ================================================
+// 2D SOLVER
+// ================================================
+let s2d = new Solver();
+let solving2d = false, steps2d = 0, backs2d = 0, start2d = 0, delay2d = 31;
+
+function buildGrid2d() {
+  const c = document.getElementById('grid2d'); c.innerHTML = '';
+  const mk = cls => { const d=document.createElement('div');d.className=cls;return d; };
+  c.appendChild(mk('corner-cell'));
+  for(let i=0;i<4;i++){const d=mk('clue-cell top');d.id=`c2t${i}`;d.textContent='-';c.appendChild(d)}
+  c.appendChild(mk('corner-cell'));
+  for(let r=0;r<4;r++){
+    const l=mk('clue-cell left');l.id=`c2l${r}`;l.textContent='-';c.appendChild(l);
+    for(let col=0;col<4;col++){
+      const cell=mk('grid-cell');cell.id=`g2-${r}-${col}`;
+      cell.innerHTML='<div class="bar"></div><span class="number" data-val="0"></span>';
+      c.appendChild(cell);
     }
-
-    // Right clue
-    const rc = makeDiv('clue-cell right');
-    rc.id = `clue-right-${r}`;
-    rc.textContent = '-';
-    container.appendChild(rc);
+    const ri=mk('clue-cell right');ri.id=`c2r${r}`;ri.textContent='-';c.appendChild(ri);
   }
-
-  // Corner bottom-left
-  container.appendChild(makeDiv('corner-cell'));
-  // Bottom clues
-  for (let c = 0; c < 4; c++) {
-    const d = makeDiv('clue-cell bottom');
-    d.id = `clue-bottom-${c}`;
-    d.textContent = '-';
-    container.appendChild(d);
-  }
-  // Corner bottom-right
-  container.appendChild(makeDiv('corner-cell'));
+  c.appendChild(mk('corner-cell'));
+  for(let i=0;i<4;i++){const d=mk('clue-cell bottom');d.id=`c2b${i}`;d.textContent='-';c.appendChild(d)}
+  c.appendChild(mk('corner-cell'));
 }
 
-function makeDiv(cls) {
-  const d = document.createElement('div');
-  d.className = cls;
-  return d;
-}
-
-function updateClueDOM() {
-  for (let i = 0; i < 4; i++) {
-    document.getElementById(`clue-top-${i}`).textContent = clues[i];
-    document.getElementById(`clue-bottom-${i}`).textContent = clues[4 + i];
-    document.getElementById(`clue-left-${i}`).textContent = clues[8 + i];
-    document.getElementById(`clue-right-${i}`).textContent = clues[12 + i];
+function buildSkyline2d(){
+  const c=document.getElementById('skyline2d');c.innerHTML='';
+  for(let r=0;r<4;r++){
+    const row=document.createElement('div');row.className='sky-row';row.style.left=`${20+r*130}px`;row.id=`sr2-${r}`;
+    const lb=document.createElement('div');lb.className='sky-label';lb.style.left='0';lb.textContent=`Row ${r+1}`;row.appendChild(lb);
+    for(let col=0;col<4;col++){const b=document.createElement('div');b.className='sky-bldg';b.id=`sb2-${r}-${col}`;b.style.height='0';b.style.background='var(--border)';row.appendChild(b)}
+    c.appendChild(row);
   }
 }
 
-function setCellDOM(r, c, val, anim = '') {
-  const cell = document.getElementById(`cell-${r}-${c}`);
-  const num = cell.querySelector('.number');
-  num.textContent = val > 0 ? val : '';
-  num.setAttribute('data-val', val);
-  cell.setAttribute('data-height', val);
-
-  cell.classList.remove('placed', 'backtrack', 'active');
-  if (anim) {
-    void cell.offsetWidth; // reflow
-    cell.classList.add(anim);
+function setCell2d(r,c,v,anim=''){
+  const cell=document.getElementById(`g2-${r}-${c}`);
+  const num=cell.querySelector('.number');
+  num.textContent=v>0?v:'';num.setAttribute('data-val',v);cell.setAttribute('data-h',v);
+  cell.classList.remove('placed','backtrack','active');
+  if(anim){void cell.offsetWidth;cell.classList.add(anim)}
+  // skyline
+  const b=document.getElementById(`sb2-${r}-${c}`);
+  const colors=['var(--border)','var(--b1)','var(--b2)','var(--b3)','var(--b4)'];
+  b.style.height=v>0?`${v*38}px`:'0';b.style.background=colors[v]||colors[0];
+}
+function setActive2d(r,c){
+  document.querySelectorAll('#grid2d .grid-cell').forEach(e=>e.classList.remove('active'));
+  if(r>=0)document.getElementById(`g2-${r}-${c}`).classList.add('active');
+}
+function updateClues2d(){
+  for(let i=0;i<4;i++){
+    document.getElementById(`c2t${i}`).textContent=s2d.clues[i];
+    document.getElementById(`c2b${i}`).textContent=s2d.clues[4+i];
+    document.getElementById(`c2l${i}`).textContent=s2d.clues[8+i];
+    document.getElementById(`c2r${i}`).textContent=s2d.clues[12+i];
   }
 }
-
-function setActiveCell(r, c) {
-  document.querySelectorAll('.grid-cell').forEach(el => el.classList.remove('active'));
-  if (r >= 0 && c >= 0) {
-    document.getElementById(`cell-${r}-${c}`).classList.add('active');
-  }
+function addLog2d(n,msg,cls=''){
+  const box=document.getElementById('log2d');
+  if(n===0)box.innerHTML='';
+  const d=document.createElement('div');d.className=`log-entry ${cls}`;
+  d.innerHTML=`<span class="n">#${n}</span><span>${msg}</span>`;
+  box.appendChild(d);box.scrollTop=box.scrollHeight;
 }
-
-// ====== SKYLINE ======
-function buildSkyline() {
-  const container = document.getElementById('skylineContainer');
-  container.innerHTML = '';
-
-  const colors = ['', 'var(--building-1)', 'var(--building-2)', 'var(--building-3)', 'var(--building-4)'];
-  const baseH = 45;
-
-  for (let r = 0; r < 4; r++) {
-    const rowDiv = document.createElement('div');
-    rowDiv.className = 'skyline-row';
-    rowDiv.style.left = `${30 + r * 140}px`;
-    rowDiv.id = `skyline-row-${r}`;
-
-    const label = document.createElement('div');
-    label.className = 'skyline-label';
-    label.style.left = '0';
-    label.textContent = `Row ${r + 1}`;
-    rowDiv.appendChild(label);
-
-    for (let c = 0; c < 4; c++) {
-      const b = document.createElement('div');
-      b.className = 'skyline-building';
-      b.id = `sky-${r}-${c}`;
-      b.style.height = '0px';
-      b.style.background = 'var(--border)';
-      rowDiv.appendChild(b);
-    }
-    container.appendChild(rowDiv);
-  }
+function updateStats2d(){
+  document.getElementById('s2dSteps').textContent=steps2d;
+  document.getElementById('s2dBacks').textContent=backs2d;
+  document.getElementById('s2dTime').textContent=((performance.now()-start2d)/1000).toFixed(1)+'s';
 }
+function setStatus2d(s,t){document.getElementById('sd2d').className=`status-dot ${s}`;document.getElementById('st2d').textContent=t}
 
-function updateSkyline(r, c, val) {
-  const b = document.getElementById(`sky-${r}-${c}`);
-  if (!b) return;
-  const colors = ['var(--border)', 'var(--building-1)', 'var(--building-2)', 'var(--building-3)', 'var(--building-4)'];
-  const baseH = 40;
-  b.style.height = val > 0 ? `${val * baseH}px` : '0px';
-  b.style.background = colors[val] || colors[0];
-}
-
-// ====== PARSER ======
-function parseClues(str) {
-  const nums = str.trim().split(/\s+/).map(Number);
-  if (nums.length !== 16 || nums.some(n => n < 1 || n > 4 || isNaN(n))) return null;
-  return nums;
-}
-
-// ====== SOLVER LOGIC (async with visualization) ======
-function rowContains(r, val) { return grid[r].includes(val); }
-function colContains(c, val) { return grid.some(row => row[c] === val); }
-function canPlace(r, c, val) { return !rowContains(r, val) && !colContains(c, val); }
-
-function visibleCount(a, b, c, d) {
-  let max = 0, count = 0;
-  [a, b, c, d].forEach(v => { if (v > max) { max = v; count++; }});
-  return count;
-}
-
-function isRowComplete(r) { return grid[r].every(v => v > 0); }
-function isColComplete(c) { return grid.every(row => row[c] > 0); }
-
-function checkRowClues(r) {
-  const l = visibleCount(grid[r][0], grid[r][1], grid[r][2], grid[r][3]);
-  const ri = visibleCount(grid[r][3], grid[r][2], grid[r][1], grid[r][0]);
-  return l === clues[8 + r] && ri === clues[12 + r];
-}
-
-function checkColClues(c) {
-  const t = visibleCount(grid[0][c], grid[1][c], grid[2][c], grid[3][c]);
-  const b = visibleCount(grid[3][c], grid[2][c], grid[1][c], grid[0][c]);
-  return t === clues[c] && b === clues[4 + c];
-}
-
-function noContradiction(r, c) {
-  if (isRowComplete(r) && !checkRowClues(r)) return false;
-  if (isColComplete(c) && !checkColClues(c)) return false;
-  return true;
-}
-
-function sleep(ms) {
-  return new Promise(res => { animationId = setTimeout(res, ms); });
-}
-
-function addLog(step, msg, type = '') {
-  const container = document.getElementById('logContainer');
-  if (step === 0) container.innerHTML = '';
-  const entry = document.createElement('div');
-  entry.className = `log-entry ${type}`;
-  entry.innerHTML = `<span class="step-num">#${step}</span><span>${msg}</span>`;
-  container.appendChild(entry);
-  container.scrollTop = container.scrollHeight;
-}
-
-async function solveVisual(pos) {
-  if (!solving) return false;
-  if (pos === 16) return true;
-
-  const r = Math.floor(pos / 4);
-  const c = pos % 4;
-
-  for (let val = 1; val <= 4; val++) {
-    if (!solving) return false;
-    if (canPlace(r, c, val)) {
-      grid[r][c] = val;
-      stepCount++;
-
-      setCellDOM(r, c, val, 'placed');
-      setActiveCell(r, c);
-      updateSkyline(r, c, val);
-      updateStats();
-      addLog(stepCount, `Place <b>${val}</b> at (${r},${c})`);
-
-      await sleep(delay);
-
-      if (noContradiction(r, c)) {
-        if (await solveVisual(pos + 1)) return true;
-      }
-
-      // Backtrack
-      grid[r][c] = 0;
-      backtrackCount++;
-      setCellDOM(r, c, 0, 'backtrack');
-      updateSkyline(r, c, 0);
-      updateStats();
-      addLog(stepCount, `Backtrack: remove ${val} from (${r},${c})`, 'backtrack');
-
-      await sleep(delay / 2);
+async function solve2d(pos){
+  if(!solving2d)return false;if(pos===16)return true;
+  const r=Math.floor(pos/4),c=pos%4;
+  for(let v=1;v<=4;v++){
+    if(!solving2d)return false;
+    if(s2d.canPlace(r,c,v)){
+      s2d.grid[r][c]=v;steps2d++;
+      setCell2d(r,c,v,'placed');setActive2d(r,c);updateStats2d();
+      addLog2d(steps2d,`Place <b>${v}</b> at (${r},${c})`);
+      await sleep(delay2d);
+      if(s2d.noContra(r,c)){if(await solve2d(pos+1))return true}
+      s2d.grid[r][c]=0;backs2d++;
+      setCell2d(r,c,0,'backtrack');updateStats2d();
+      addLog2d(steps2d,`Backtrack: remove ${v} from (${r},${c})`,'back');
+      await sleep(delay2d/2);
     }
   }
   return false;
 }
 
-function updateStats() {
-  document.getElementById('statSteps').textContent = stepCount;
-  document.getElementById('statBacks').textContent = backtrackCount;
-  const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
-  document.getElementById('statTime').textContent = `${elapsed}s`;
+async function startSolve2d(){
+  if(solving2d)return;
+  const p=parseClues(document.getElementById('clueInput2d').value);
+  if(!p){setStatus2d('error','Invalid input');return}
+  s2d.init(p);steps2d=0;backs2d=0;solving2d=true;start2d=performance.now();
+  updateClues2d();
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++)setCell2d(r,c,0);
+  document.getElementById('btnSolve2d').disabled=true;
+  setStatus2d('solving','Solving...');addLog2d(0,'Starting backtracking...');
+  const found=await solve2d(0);
+  solving2d=false;document.getElementById('btnSolve2d').disabled=false;
+  setActive2d(-1,-1);updateStats2d();
+  if(found){setStatus2d('solved','Solved!');addLog2d(steps2d,'✅ Solution found!','ok')}
+  else{setStatus2d('error','No solution');addLog2d(steps2d,'❌ No solution found.','back')}
 }
-
-function setStatus(state, text) {
-  const dot = document.getElementById('statusDot');
-  const txt = document.getElementById('statusText');
-  dot.className = `status-dot ${state}`;
-  txt.textContent = text;
+function reset2d(){
+  solving2d=false;s2d.init([]);steps2d=0;backs2d=0;
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++)setCell2d(r,c,0);
+  ['s2dSteps','s2dBacks'].forEach(id=>document.getElementById(id).textContent='0');
+  document.getElementById('s2dTime').textContent='0s';
+  document.getElementById('log2d').innerHTML='<span style="opacity:.4">Waiting...</span>';
+  document.getElementById('btnSolve2d').disabled=false;
+  setStatus2d('','Ready');setActive2d(-1,-1);
 }
+function setP2d(v){document.getElementById('clueInput2d').value=v}
+function updateSpeed2d(){const v=document.getElementById('speed2d').value;delay2d=101-v;document.getElementById('speedVal2d').textContent=delay2d+'ms'}
 
-// ====== ACTIONS ======
-async function startSolve() {
-  if (solving) return;
+buildGrid2d();buildSkyline2d();updateSpeed2d();
 
-  const parsed = parseClues(document.getElementById('clueInput').value);
-  if (!parsed) {
-    setStatus('error', 'Invalid input — 16 digits from 1 to 4');
-    return;
+// ================================================
+// 3D SOLVER (Three.js)
+// ================================================
+let threeInitialized = false;
+let renderer, scene, camera3d;
+let s3d = new Solver();
+let solving3d=false,steps3d=0,backs3d=0,start3d=0,delay3d=31;
+let buildings3d=[], bTargets=[];
+let camAngle=Math.PI/4,camPitch=0.85,camDist=18;
+let dragging=false,lastM={x:0,y:0};
+let glowRing,ringMat,clock3d;
+let activeR3d=-1,activeC3d=-1;
+
+function initThree(){
+  if(threeInitialized)return;threeInitialized=true;
+  const canvas=document.getElementById('canvas3d');
+  const wrap=document.getElementById('threeWrapper');
+
+  renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+  renderer.setSize(wrap.clientWidth,wrap.clientHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
+
+  scene=new THREE.Scene();scene.background=new THREE.Color(0x060709);
+  scene.fog=new THREE.FogExp2(0x060709,0.018);
+
+  camera3d=new THREE.PerspectiveCamera(45,wrap.clientWidth/wrap.clientHeight,0.1,200);
+  camera3d.position.set(12,14,12);camera3d.lookAt(0,0,0);
+
+  // Controls
+  canvas.addEventListener('mousedown',e=>{dragging=true;lastM={x:e.clientX,y:e.clientY}});
+  canvas.addEventListener('touchstart',e=>{dragging=true;lastM={x:e.touches[0].clientX,y:e.touches[0].clientY}});
+  window.addEventListener('mouseup',()=>dragging=false);
+  window.addEventListener('touchend',()=>dragging=false);
+  canvas.addEventListener('mousemove',e=>{if(!dragging)return;camAngle-=(e.clientX-lastM.x)*0.008;camPitch=Math.max(0.2,Math.min(1.4,camPitch+(e.clientY-lastM.y)*0.006));lastM={x:e.clientX,y:e.clientY}});
+  canvas.addEventListener('touchmove',e=>{if(!dragging)return;camAngle-=(e.touches[0].clientX-lastM.x)*0.008;camPitch=Math.max(0.2,Math.min(1.4,camPitch+(e.touches[0].clientY-lastM.y)*0.006));lastM={x:e.touches[0].clientX,y:e.touches[0].clientY}});
+  canvas.addEventListener('wheel',e=>{camDist=Math.max(8,Math.min(35,camDist+e.deltaY*0.02))});
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x404060,0.6));
+  const dl=new THREE.DirectionalLight(0xffeedd,1.2);dl.position.set(8,16,6);dl.castShadow=true;
+  dl.shadow.mapSize.set(1024,1024);dl.shadow.camera.near=1;dl.shadow.camera.far=40;
+  dl.shadow.camera.left=-12;dl.shadow.camera.right=12;dl.shadow.camera.top=12;dl.shadow.camera.bottom=-12;
+  scene.add(dl);
+  const rl=new THREE.DirectionalLight(0x6366f1,0.3);rl.position.set(-6,8,-8);scene.add(rl);
+  const pl=new THREE.PointLight(0xf59e0b,0.4,30);pl.position.set(0,10,0);scene.add(pl);
+
+  // Ground + grid
+  const gnd=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x0a0c14,roughness:0.95,metalness:0.1}));
+  gnd.rotation.x=-Math.PI/2;gnd.position.y=-0.01;gnd.receiveShadow=true;scene.add(gnd);
+  scene.add(new THREE.GridHelper(40,40,0x1a1d2e,0x12141e));
+
+  // Platform
+  const plat=new THREE.Mesh(new THREE.BoxGeometry(7.2,0.15,7.2),new THREE.MeshStandardMaterial({color:0x14161f,roughness:0.8,metalness:0.3}));
+  plat.position.y=0.075;plat.receiveShadow=true;plat.castShadow=true;scene.add(plat);
+
+  // Cell bases
+  const cbg=new THREE.BoxGeometry(1.55,0.06,1.55);
+  const cbm=new THREE.MeshStandardMaterial({color:0x1a1d2a,roughness:0.7,metalness:0.2});
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++){
+    const b=new THREE.Mesh(cbg,cbm);b.position.set(-2.4+c*1.6,0.18,-2.4+r*1.6);b.receiveShadow=true;scene.add(b);
   }
 
-  clues = parsed;
-  grid = Array.from({length:4}, () => Array(4).fill(0));
-  stepCount = 0;
-  backtrackCount = 0;
-  solving = true;
-  startTime = performance.now();
-
-  updateClueDOM();
-  for (let r = 0; r < 4; r++)
-    for (let c = 0; c < 4; c++) {
-      setCellDOM(r, c, 0);
-      updateSkyline(r, c, 0);
+  // Buildings
+  const BCOL=[0,0x5b7bf7,0x8b5cf6,0xec4899,0xe8a525];
+  const ECOL=[0,0x4f46e5,0x7c3aed,0xdb2777,0xd97706];
+  for(let r=0;r<4;r++){
+    buildings3d[r]=[];bTargets[r]=[];
+    for(let c=0;c<4;c++){
+      const g=new THREE.Group();g.position.set(-2.4+c*1.6,0.15,-2.4+r*1.6);scene.add(g);
+      const bodyMat=new THREE.MeshStandardMaterial({color:0x1a1d2a,roughness:0.4,metalness:0.6,transparent:true,opacity:0});
+      const body=new THREE.Mesh(new THREE.BoxGeometry(1.2,1,1.2),bodyMat);body.castShadow=true;body.receiveShadow=true;g.add(body);
+      const edgeMat=new THREE.LineBasicMaterial({color:0x2a2d3e,transparent:true,opacity:0});
+      const edges=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.2,1,1.2)),edgeMat);g.add(edges);
+      const capMat=new THREE.MeshStandardMaterial({color:0,emissive:0,emissiveIntensity:2,transparent:true,opacity:0});
+      const cap=new THREE.Mesh(new THREE.BoxGeometry(1.22,0.04,1.22),capMat);g.add(cap);
+      buildings3d[r][c]={g,body,edges,cap,bodyMat,edgeMat,capMat,BCOL,ECOL};
+      bTargets[r][c]={h:0,val:0,glow:0};
     }
-
-  document.getElementById('btnSolve').disabled = true;
-  setStatus('solving', 'Solving...');
-  addLog(0, 'Starting backtracking...', '');
-
-  const found = await solveVisual(0);
-
-  solving = false;
-  document.getElementById('btnSolve').disabled = false;
-  setActiveCell(-1, -1);
-  updateStats();
-
-  if (found) {
-    setStatus('solved', 'Solved!');
-    addLog(stepCount, '✅ Solution found!', 'success');
-  } else {
-    setStatus('error', 'No solution');
-    addLog(stepCount, '❌ No solution found.', 'backtrack');
   }
-}
 
-function resetAll() {
-  solving = false;
-  if (animationId) clearTimeout(animationId);
-  grid = Array.from({length:4}, () => Array(4).fill(0));
-  stepCount = 0;
-  backtrackCount = 0;
+  // Glow ring
+  ringMat=new THREE.MeshBasicMaterial({color:0xe8a525,transparent:true,opacity:0,side:THREE.DoubleSide});
+  glowRing=new THREE.Mesh(new THREE.RingGeometry(0.85,0.95,32),ringMat);
+  glowRing.rotation.x=-Math.PI/2;glowRing.position.y=0.17;scene.add(glowRing);
 
-  for (let r = 0; r < 4; r++)
-    for (let c = 0; c < 4; c++) {
-      setCellDOM(r, c, 0);
-      updateSkyline(r, c, 0);
+  // Particles
+  const pCount=250,pPos=new Float32Array(pCount*3);
+  for(let i=0;i<pCount;i++){pPos[i*3]=(Math.random()-0.5)*30;pPos[i*3+1]=Math.random()*15+1;pPos[i*3+2]=(Math.random()-0.5)*30}
+  const pGeo=new THREE.BufferGeometry();pGeo.setAttribute('position',new THREE.BufferAttribute(pPos,3));
+  const pts=new THREE.Points(pGeo,new THREE.PointsMaterial({color:0x5b7bf7,size:0.08,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false}));
+  scene.add(pts);
+
+  clock3d=new THREE.Clock();
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt=Math.min(clock3d.getDelta(),0.05),t=clock3d.elapsedTime;
+
+    // Camera
+    const tx=camDist*Math.sin(camAngle)*Math.cos(camPitch);
+    const ty=camDist*Math.sin(camPitch);
+    const tz=camDist*Math.cos(camAngle)*Math.cos(camPitch);
+    camera3d.position.x+=(tx-camera3d.position.x)*3*dt;
+    camera3d.position.y+=(ty-camera3d.position.y)*3*dt;
+    camera3d.position.z+=(tz-camera3d.position.z)*3*dt;
+    camera3d.lookAt(0,1.5,0);
+
+    // Buildings
+    for(let r=0;r<4;r++)for(let c=0;c<4;c++){
+      const b=buildings3d[r][c],tg=bTargets[r][c];
+      const h=Math.max(0.001,b.body.scale.y+(tg.h-b.body.scale.y)*8*dt);
+      b.body.scale.y=h;b.body.position.y=h*0.5;
+      if(tg.val>0){
+        b.bodyMat.color.lerp(new THREE.Color(b.BCOL[tg.val]),5*dt);
+        b.bodyMat.opacity+=(0.92-b.bodyMat.opacity)*6*dt;
+        b.edgeMat.color.set(b.ECOL[tg.val]);b.edgeMat.opacity+=(0.6-b.edgeMat.opacity)*6*dt;
+        b.capMat.emissive.lerp(new THREE.Color(b.BCOL[tg.val]),5*dt);b.capMat.opacity+=(1-b.capMat.opacity)*6*dt;
+      }else{b.bodyMat.opacity*=(1-8*dt);b.edgeMat.opacity*=(1-8*dt);b.capMat.opacity*=(1-8*dt)}
+      b.edges.scale.y=h;b.edges.position.y=h*0.5;
+      b.cap.position.y=h+0.02;
+      b.capMat.emissiveIntensity+=(tg.glow-b.capMat.emissiveIntensity)*6*dt;
     }
 
-  document.getElementById('statSteps').textContent = '0';
-  document.getElementById('statBacks').textContent = '0';
-  document.getElementById('statTime').textContent = '0s';
-  document.getElementById('logContainer').innerHTML = '<div style="color:var(--text-dim);opacity:0.5;">Waiting...</div>';
-  document.getElementById('btnSolve').disabled = false;
-  setStatus('', 'Ready');
-  setActiveCell(-1, -1);
+    // Ring
+    if(activeR3d>=0){glowRing.position.x=-2.4+activeC3d*1.6;glowRing.position.z=-2.4+activeR3d*1.6;ringMat.opacity=0.5+Math.sin(t*6)*0.3}
+    else ringMat.opacity*=0.9;
+
+    // Particles
+    const pa=pts.geometry.attributes.position.array;
+    for(let i=0;i<pCount;i++){pa[i*3+1]+=dt*0.15;if(pa[i*3+1]>16)pa[i*3+1]=1}
+    pts.geometry.attributes.position.needsUpdate=true;pts.rotation.y+=dt*0.02;
+
+    pl.intensity=0.3+Math.sin(t*2)*0.15;
+    renderer.render(scene,camera3d);
+  }
+  animate();
 }
 
-function setPreset(val) {
-  document.getElementById('clueInput').value = val;
+function resizeThree(){
+  if(!threeInitialized)return;
+  const w=document.getElementById('threeWrapper');
+  renderer.setSize(w.clientWidth,w.clientHeight);
+  camera3d.aspect=w.clientWidth/w.clientHeight;
+  camera3d.updateProjectionMatrix();
+}
+window.addEventListener('resize',resizeThree);
+
+function setB3d(r,c,v){
+  bTargets[r][c].val=v;bTargets[r][c].h=v>0?v*1.5:0;bTargets[r][c].glow=v>0?3:0;
+  setTimeout(()=>{bTargets[r][c].glow=v>0?1:0},200);
+}
+function setActive3d(r,c){activeR3d=r;activeC3d=c}
+function setStatus3d(s,t){document.getElementById('sd3d').className=`status-dot ${s}`;document.getElementById('st3d').textContent=t}
+function updateStats3d(){
+  document.getElementById('s3dSteps').textContent=steps3d;
+  document.getElementById('s3dBacks').textContent=backs3d;
+  document.getElementById('s3dTime').textContent=((performance.now()-start3d)/1000).toFixed(1)+'s';
 }
 
-function updateSpeed() {
-  const v = document.getElementById('speedSlider').value;
-  delay = 101 - v; // invert: high slider = fast = low delay
-  document.getElementById('speedValue').textContent = `${delay}ms`;
+async function solve3dRec(pos){
+  if(!solving3d)return false;if(pos===16)return true;
+  const r=Math.floor(pos/4),c=pos%4;
+  for(let v=1;v<=4;v++){
+    if(!solving3d)return false;
+    if(s3d.canPlace(r,c,v)){
+      s3d.grid[r][c]=v;steps3d++;
+      setB3d(r,c,v);setActive3d(r,c);updateStats3d();
+      await sleep(delay3d);
+      if(s3d.noContra(r,c)){if(await solve3dRec(pos+1))return true}
+      s3d.grid[r][c]=0;backs3d++;setB3d(r,c,0);updateStats3d();
+      await sleep(delay3d/2);
+    }
+  }
+  return false;
 }
 
-// ====== INIT ======
-buildGridDOM();
-buildSkyline();
-updateSpeed();
+async function startSolve3d(){
+  if(solving3d)return;
+  const p=parseClues(document.getElementById('clueInput3d').value);
+  if(!p){setStatus3d('error','Invalid input');return}
+  s3d.init(p);steps3d=0;backs3d=0;solving3d=true;start3d=performance.now();
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++)setB3d(r,c,0);
+  document.getElementById('btnSolve3d').disabled=true;
+  setStatus3d('solving','Solving...');
+  const found=await solve3dRec(0);
+  solving3d=false;document.getElementById('btnSolve3d').disabled=false;
+  setActive3d(-1,-1);updateStats3d();
+  if(found){
+    setStatus3d('solved','Solved!');
+    for(let r=0;r<4;r++)for(let c=0;c<4;c++)bTargets[r][c].glow=4;
+    setTimeout(()=>{for(let r=0;r<4;r++)for(let c=0;c<4;c++)bTargets[r][c].glow=1.5},600);
+  }else setStatus3d('error','No solution');
+}
+function reset3d(){
+  solving3d=false;s3d.init([]);steps3d=0;backs3d=0;
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++)setB3d(r,c,0);
+  ['s3dSteps','s3dBacks'].forEach(id=>document.getElementById(id).textContent='0');
+  document.getElementById('s3dTime').textContent='0s';
+  document.getElementById('btnSolve3d').disabled=false;
+  setStatus3d('','Ready');setActive3d(-1,-1);
+}
+function setP3d(v){document.getElementById('clueInput3d').value=v}
+function updateSpeed3d(){const v=document.getElementById('speed3d').value;delay3d=101-v;document.getElementById('speedVal3d').textContent=delay3d+'ms'}
+function setCam3d(m){
+  if(m==='persp'){camAngle=Math.PI/4;camPitch=0.85;camDist=18}
+  if(m==='top'){camAngle=0;camPitch=1.39;camDist=20}
+  if(m==='front'){camAngle=0;camPitch=0.4;camDist=20}
+  if(m==='iso'){camAngle=Math.PI/4;camPitch=0.6;camDist=22}
+}
+updateSpeed3d();
 </script>
 </body>
 </html>
