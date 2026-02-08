@@ -1,4 +1,4 @@
-# 🏙️ Rush 01 — Visual Backtracking Simulator
+# 🏙️ Visual Backtracking Simulator
 
 > **An interactive visual simulation of the 4×4 Skyscraper puzzle solver with real-time backtracking animation.**
 
@@ -18,7 +18,7 @@
 
 ## 🚀 Usage
 
-Just open `rush01_simulator.html` in any modern browser. No dependencies, no build step.
+Just open `skyscraper_simulator.html` in any modern browser. No dependencies, no build step.
 
 1. Enter 16 clues (digits 1–4 separated by spaces) or pick a preset
 2. Click **Résoudre** and watch the algorithm work
