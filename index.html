@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyscraper Solver — Visual Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0b0f;
+    --surface: #12141c;
+    --surface-2: #1a1d2a;
+    --border: #2a2d3e;
+    --accent: #f59e0b;
+    --accent-glow: #f59e0b55;
+    --accent-2: #3b82f6;
+    --accent-2-glow: #3b82f655;
+    --text: #e8e6e3;
+    --text-dim: #6b7280;
+    --success: #10b981;
+    --error: #ef4444;
+    --building-1: #6366f1;
+    --building-2: #8b5cf6;
+    --building-3: #ec4899;
+    --building-4: #f59e0b;
+    --radius: 14px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Sora', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* === BACKGROUND ATMOSPHERE === */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse 600px 400px at 20% 20%, #6366f118 0%, transparent 70%),
+      radial-gradient(ellipse 500px 500px at 80% 70%, #f59e0b0a 0%, transparent 70%),
+      radial-gradient(ellipse 400px 300px at 50% 50%, #8b5cf60a 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 60px;
+  }
+
+  /* === HEADER === */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  header .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+
+  header .badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse-dot 2s ease infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(36px, 5vw, 56px);
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--text) 0%, var(--text-dim) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header p {
+    color: var(--text-dim);
+    font-size: 15px;
+    margin-top: 12px;
+    font-weight: 300;
+  }
+
+  /* === MAIN LAYOUT === */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+
+  @media (max-width: 800px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* === CARD STYLE === */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .card-header h2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+  }
+
+  .card-body { padding: 24px; }
+
+  /* === INPUT SECTION === */
+  .input-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .input-row input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .input-row input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .input-row input::placeholder {
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-family: 'Sora', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    box-shadow: 0 2px 12px var(--accent-glow);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px var(--accent-glow);
+  }
+
+  .btn-secondary {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover {
+    background: var(--border);
+  }
+
+  .btn-sm {
+    padding: 8px 14px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .presets span {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    width: 100%;
+    margin-bottom: 2px;
+  }
+
+  /* === STATS === */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .stat-box {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+
+  .stat-box .label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+
+  .stat-box .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 4px;
+    color: var(--accent);
+  }
+
+  /* === GRID VISUALIZATION === */
+  .grid-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .grid-container {
+    display: grid;
+    grid-template-columns: 48px repeat(4, 80px) 48px;
+    grid-template-rows: 48px repeat(4, 80px) 48px;
+    gap: 0;
+    position: relative;
+  }
+
+  @media (max-width: 500px) {
+    .grid-container {
+      grid-template-columns: 36px repeat(4, 60px) 36px;
+      grid-template-rows: 36px repeat(4, 60px) 36px;
+    }
+  }
+
+  .clue-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    opacity: 0.8;
+  }
+
+  .clue-cell.top { align-items: flex-end; padding-bottom: 8px; }
+  .clue-cell.bottom { align-items: flex-start; padding-top: 8px; }
+  .clue-cell.left { justify-content: flex-end; padding-right: 8px; }
+  .clue-cell.right { justify-content: flex-start; padding-left: 8px; }
+
+  .grid-cell {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    overflow: hidden;
+  }
+
+  .grid-cell.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 16px var(--accent-glow), inset 0 0 20px rgba(245, 158, 11, 0.05);
+    z-index: 2;
+  }
+
+  .grid-cell.placed {
+    animation: cell-place 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .grid-cell.backtrack {
+    animation: cell-backtrack 0.25s ease forwards;
+  }
+
+  @keyframes cell-place {
+    0% { transform: scale(0.7); opacity: 0.5; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes cell-backtrack {
+    0% { background: rgba(239, 68, 68, 0.15); }
+    100% { background: var(--surface-2); }
+  }
+
+  .grid-cell .number {
+    font-family: 'DM Serif Display', serif;
+    font-size: 32px;
+    font-weight: 400;
+    transition: all 0.3s;
+  }
+
+  @media (max-width: 500px) {
+    .grid-cell .number { font-size: 24px; }
+  }
+
+  .grid-cell .number[data-val="1"] { color: var(--building-1); }
+  .grid-cell .number[data-val="2"] { color: var(--building-2); }
+  .grid-cell .number[data-val="3"] { color: var(--building-3); }
+  .grid-cell .number[data-val="4"] { color: var(--building-4); }
+
+  /* Building bars inside cells */
+  .grid-cell .building-bar {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 4px 4px 0 0;
+    transition: height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    opacity: 0.15;
+    width: 50%;
+  }
+
+  .grid-cell[data-height="1"] .building-bar { height: 25%; background: var(--building-1); }
+  .grid-cell[data-height="2"] .building-bar { height: 50%; background: var(--building-2); }
+  .grid-cell[data-height="3"] .building-bar { height: 75%; background: var(--building-3); }
+  .grid-cell[data-height="4"] .building-bar { height: 100%; background: var(--building-4); }
+
+  .corner-cell { /* empty corners */ }
+
+  /* === 3D SKYLINE === */
+  .skyline-card { grid-column: 1 / -1; }
+
+  .skyline-container {
+    width: 100%;
+    height: 260px;
+    position: relative;
+    background: linear-gradient(180deg, #0d0f18 0%, #151829 100%);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .skyline-container::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+
+  .skyline-row {
+    position: absolute;
+    bottom: 20px;
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+    transition: all 0.5s ease;
+  }
+
+  .skyline-building {
+    width: 28px;
+    border-radius: 4px 4px 0 0;
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+  }
+
+  .skyline-building::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 4px 4px 0 0;
+  }
+
+  .skyline-label {
+    position: absolute;
+    bottom: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  /* === SPEED CONTROL === */
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .speed-control label {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+
+  .speed-control input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  .speed-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+
+  .speed-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    min-width: 50px;
+    text-align: right;
+  }
+
+  /* === LOG === */
+  .log-container {
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text-dim);
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 14px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .log-container::-webkit-scrollbar { width: 6px; }
+  .log-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .log-entry { display: flex; gap: 8px; }
+  .log-entry .step-num { color: var(--accent); min-width: 40px; text-align: right; }
+  .log-entry.backtrack { color: var(--error); opacity: 0.7; }
+  .log-entry.success { color: var(--success); }
+
+  /* === STATUS BAR === */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--bg);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .status-dot.solving {
+    background: var(--accent);
+    animation: pulse-dot 1s ease infinite;
+  }
+  .status-dot.solved {
+    background: var(--success);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+  }
+  .status-dot.error {
+    background: var(--error);
+  }
+
+  .fade-in {
+    animation: fadeIn 0.5s ease forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="badge">Skyscraper Puzzle</div>
+    <h1>Skyscraper Solver</h1>
+    <p>Visual backtracking simulation — 4×4 Skyscraper Puzzle</p>
+  </header>
+
+  <div class="main-grid">
+    <!-- LEFT: Controls -->
+    <div style="display:flex;flex-direction:column;gap:24px;">
+      <div class="card">
+        <div class="card-header">
+          <h2>⚡ Input</h2>
+        </div>
+        <div class="card-body input-section">
+          <div class="input-row">
+            <input type="text" id="clueInput" placeholder="4 3 2 1 1 2 2 2 4 3 2 1 1 2 2 2" value="4 3 2 1 1 2 2 2 4 3 2 1 1 2 2 2" />
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-primary" id="btnSolve" onclick="startSolve()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Solve
+            </button>
+            <button class="btn btn-secondary" id="btnReset" onclick="resetAll()">Reset</button>
+          </div>
+          <div class="presets">
+            <span>Presets:</span>
+            <button class="btn btn-secondary btn-sm" onclick="setPreset('4 3 2 1 1 2 2 2 4 3 2 1 1 2 2 2')">Classic</button>
+            <button class="btn btn-secondary btn-sm" onclick="setPreset('1 2 3 4 4 3 2 1 1 2 3 4 4 3 2 1')">Mirror</button>
+            <button class="btn btn-secondary btn-sm" onclick="setPreset('2 1 3 2 3 2 1 2 2 3 1 2 2 1 3 2')">Medium</button>
+            <button class="btn btn-secondary btn-sm" onclick="setPreset('1 2 2 2 2 2 2 1 1 2 2 2 2 2 2 1')">Open</button>
+          </div>
+          <div class="speed-control">
+            <label>Speed</label>
+            <input type="range" id="speedSlider" min="1" max="100" value="60" oninput="updateSpeed()">
+            <span class="speed-value" id="speedValue">60ms</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>📊 Statistics</h2>
+        </div>
+        <div class="card-body">
+          <div class="stats">
+            <div class="stat-box">
+              <div class="label">Steps</div>
+              <div class="value" id="statSteps">0</div>
+            </div>
+            <div class="stat-box">
+              <div class="label">Backtracks</div>
+              <div class="value" id="statBacks" style="color:var(--error)">0</div>
+            </div>
+            <div class="stat-box">
+              <div class="label">Time</div>
+              <div class="value" id="statTime" style="color:var(--accent-2)">0s</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>📜 Log</h2>
+        </div>
+        <div class="card-body">
+          <div class="log-container" id="logContainer">
+            <div style="color:var(--text-dim);opacity:0.5;">Waiting...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Grid + Skyline -->
+    <div style="display:flex;flex-direction:column;gap:24px;">
+      <div class="card">
+        <div class="card-header">
+          <h2>🏙️ Grid</h2>
+          <div class="status-bar" style="margin:0;padding:6px 12px;">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText" style="font-size:12px;color:var(--text-dim);">Ready</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="grid-wrapper">
+            <div class="grid-container" id="gridContainer"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card skyline-card">
+        <div class="card-header">
+          <h2>🌆 Skyline View</h2>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div class="skyline-container" id="skylineContainer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ====== STATE ======
+let grid = Array.from({length:4}, () => Array(4).fill(0));
+let clues = new Array(16).fill(0);
+let solving = false;
+let stepCount = 0;
+let backtrackCount = 0;
+let startTime = 0;
+let delay = 40;
+let animationId = null;
+
+// ====== INIT GRID DOM ======
+function buildGridDOM() {
+  const container = document.getElementById('gridContainer');
+  container.innerHTML = '';
+
+  // Corner top-left
+  container.appendChild(makeDiv('corner-cell'));
+
+  // Top clues
+  for (let c = 0; c < 4; c++) {
+    const d = makeDiv('clue-cell top');
+    d.id = `clue-top-${c}`;
+    d.textContent = '-';
+    container.appendChild(d);
+  }
+  // Corner top-right
+  container.appendChild(makeDiv('corner-cell'));
+
+  for (let r = 0; r < 4; r++) {
+    // Left clue
+    const lc = makeDiv('clue-cell left');
+    lc.id = `clue-left-${r}`;
+    lc.textContent = '-';
+    container.appendChild(lc);
+
+    // Grid cells
+    for (let c = 0; c < 4; c++) {
+      const cell = makeDiv('grid-cell');
+      cell.id = `cell-${r}-${c}`;
+      cell.innerHTML = `<div class="building-bar"></div><span class="number" data-val="0"></span>`;
+      container.appendChild(cell);
+    }
+
+    // Right clue
+    const rc = makeDiv('clue-cell right');
+    rc.id = `clue-right-${r}`;
+    rc.textContent = '-';
+    container.appendChild(rc);
+  }
+
+  // Corner bottom-left
+  container.appendChild(makeDiv('corner-cell'));
+  // Bottom clues
+  for (let c = 0; c < 4; c++) {
+    const d = makeDiv('clue-cell bottom');
+    d.id = `clue-bottom-${c}`;
+    d.textContent = '-';
+    container.appendChild(d);
+  }
+  // Corner bottom-right
+  container.appendChild(makeDiv('corner-cell'));
+}
+
+function makeDiv(cls) {
+  const d = document.createElement('div');
+  d.className = cls;
+  return d;
+}
+
+function updateClueDOM() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(`clue-top-${i}`).textContent = clues[i];
+    document.getElementById(`clue-bottom-${i}`).textContent = clues[4 + i];
+    document.getElementById(`clue-left-${i}`).textContent = clues[8 + i];
+    document.getElementById(`clue-right-${i}`).textContent = clues[12 + i];
+  }
+}
+
+function setCellDOM(r, c, val, anim = '') {
+  const cell = document.getElementById(`cell-${r}-${c}`);
+  const num = cell.querySelector('.number');
+  num.textContent = val > 0 ? val : '';
+  num.setAttribute('data-val', val);
+  cell.setAttribute('data-height', val);
+
+  cell.classList.remove('placed', 'backtrack', 'active');
+  if (anim) {
+    void cell.offsetWidth; // reflow
+    cell.classList.add(anim);
+  }
+}
+
+function setActiveCell(r, c) {
+  document.querySelectorAll('.grid-cell').forEach(el => el.classList.remove('active'));
+  if (r >= 0 && c >= 0) {
+    document.getElementById(`cell-${r}-${c}`).classList.add('active');
+  }
+}
+
+// ====== SKYLINE ======
+function buildSkyline() {
+  const container = document.getElementById('skylineContainer');
+  container.innerHTML = '';
+
+  const colors = ['', 'var(--building-1)', 'var(--building-2)', 'var(--building-3)', 'var(--building-4)'];
+  const baseH = 45;
+
+  for (let r = 0; r < 4; r++) {
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'skyline-row';
+    rowDiv.style.left = `${30 + r * 140}px`;
+    rowDiv.id = `skyline-row-${r}`;
+
+    const label = document.createElement('div');
+    label.className = 'skyline-label';
+    label.style.left = '0';
+    label.textContent = `Row ${r + 1}`;
+    rowDiv.appendChild(label);
+
+    for (let c = 0; c < 4; c++) {
+      const b = document.createElement('div');
+      b.className = 'skyline-building';
+      b.id = `sky-${r}-${c}`;
+      b.style.height = '0px';
+      b.style.background = 'var(--border)';
+      rowDiv.appendChild(b);
+    }
+    container.appendChild(rowDiv);
+  }
+}
+
+function updateSkyline(r, c, val) {
+  const b = document.getElementById(`sky-${r}-${c}`);
+  if (!b) return;
+  const colors = ['var(--border)', 'var(--building-1)', 'var(--building-2)', 'var(--building-3)', 'var(--building-4)'];
+  const baseH = 40;
+  b.style.height = val > 0 ? `${val * baseH}px` : '0px';
+  b.style.background = colors[val] || colors[0];
+}
+
+// ====== PARSER ======
+function parseClues(str) {
+  const nums = str.trim().split(/\s+/).map(Number);
+  if (nums.length !== 16 || nums.some(n => n < 1 || n > 4 || isNaN(n))) return null;
+  return nums;
+}
+
+// ====== SOLVER LOGIC (async with visualization) ======
+function rowContains(r, val) { return grid[r].includes(val); }
+function colContains(c, val) { return grid.some(row => row[c] === val); }
+function canPlace(r, c, val) { return !rowContains(r, val) && !colContains(c, val); }
+
+function visibleCount(a, b, c, d) {
+  let max = 0, count = 0;
+  [a, b, c, d].forEach(v => { if (v > max) { max = v; count++; }});
+  return count;
+}
+
+function isRowComplete(r) { return grid[r].every(v => v > 0); }
+function isColComplete(c) { return grid.every(row => row[c] > 0); }
+
+function checkRowClues(r) {
+  const l = visibleCount(grid[r][0], grid[r][1], grid[r][2], grid[r][3]);
+  const ri = visibleCount(grid[r][3], grid[r][2], grid[r][1], grid[r][0]);
+  return l === clues[8 + r] && ri === clues[12 + r];
+}
+
+function checkColClues(c) {
+  const t = visibleCount(grid[0][c], grid[1][c], grid[2][c], grid[3][c]);
+  const b = visibleCount(grid[3][c], grid[2][c], grid[1][c], grid[0][c]);
+  return t === clues[c] && b === clues[4 + c];
+}
+
+function noContradiction(r, c) {
+  if (isRowComplete(r) && !checkRowClues(r)) return false;
+  if (isColComplete(c) && !checkColClues(c)) return false;
+  return true;
+}
+
+function sleep(ms) {
+  return new Promise(res => { animationId = setTimeout(res, ms); });
+}
+
+function addLog(step, msg, type = '') {
+  const container = document.getElementById('logContainer');
+  if (step === 0) container.innerHTML = '';
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  entry.innerHTML = `<span class="step-num">#${step}</span><span>${msg}</span>`;
+  container.appendChild(entry);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function solveVisual(pos) {
+  if (!solving) return false;
+  if (pos === 16) return true;
+
+  const r = Math.floor(pos / 4);
+  const c = pos % 4;
+
+  for (let val = 1; val <= 4; val++) {
+    if (!solving) return false;
+    if (canPlace(r, c, val)) {
+      grid[r][c] = val;
+      stepCount++;
+
+      setCellDOM(r, c, val, 'placed');
+      setActiveCell(r, c);
+      updateSkyline(r, c, val);
+      updateStats();
+      addLog(stepCount, `Place <b>${val}</b> at (${r},${c})`);
+
+      await sleep(delay);
+
+      if (noContradiction(r, c)) {
+        if (await solveVisual(pos + 1)) return true;
+      }
+
+      // Backtrack
+      grid[r][c] = 0;
+      backtrackCount++;
+      setCellDOM(r, c, 0, 'backtrack');
+      updateSkyline(r, c, 0);
+      updateStats();
+      addLog(stepCount, `Backtrack: remove ${val} from (${r},${c})`, 'backtrack');
+
+      await sleep(delay / 2);
+    }
+  }
+  return false;
+}
+
+function updateStats() {
+  document.getElementById('statSteps').textContent = stepCount;
+  document.getElementById('statBacks').textContent = backtrackCount;
+  const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+  document.getElementById('statTime').textContent = `${elapsed}s`;
+}
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  dot.className = `status-dot ${state}`;
+  txt.textContent = text;
+}
+
+// ====== ACTIONS ======
+async function startSolve() {
+  if (solving) return;
+
+  const parsed = parseClues(document.getElementById('clueInput').value);
+  if (!parsed) {
+    setStatus('error', 'Invalid input — 16 digits from 1 to 4');
+    return;
+  }
+
+  clues = parsed;
+  grid = Array.from({length:4}, () => Array(4).fill(0));
+  stepCount = 0;
+  backtrackCount = 0;
+  solving = true;
+  startTime = performance.now();
+
+  updateClueDOM();
+  for (let r = 0; r < 4; r++)
+    for (let c = 0; c < 4; c++) {
+      setCellDOM(r, c, 0);
+      updateSkyline(r, c, 0);
+    }
+
+  document.getElementById('btnSolve').disabled = true;
+  setStatus('solving', 'Solving...');
+  addLog(0, 'Starting backtracking...', '');
+
+  const found = await solveVisual(0);
+
+  solving = false;
+  document.getElementById('btnSolve').disabled = false;
+  setActiveCell(-1, -1);
+  updateStats();
+
+  if (found) {
+    setStatus('solved', 'Solved!');
+    addLog(stepCount, '✅ Solution found!', 'success');
+  } else {
+    setStatus('error', 'No solution');
+    addLog(stepCount, '❌ No solution found.', 'backtrack');
+  }
+}
+
+function resetAll() {
+  solving = false;
+  if (animationId) clearTimeout(animationId);
+  grid = Array.from({length:4}, () => Array(4).fill(0));
+  stepCount = 0;
+  backtrackCount = 0;
+
+  for (let r = 0; r < 4; r++)
+    for (let c = 0; c < 4; c++) {
+      setCellDOM(r, c, 0);
+      updateSkyline(r, c, 0);
+    }
+
+  document.getElementById('statSteps').textContent = '0';
+  document.getElementById('statBacks').textContent = '0';
+  document.getElementById('statTime').textContent = '0s';
+  document.getElementById('logContainer').innerHTML = '<div style="color:var(--text-dim);opacity:0.5;">Waiting...</div>';
+  document.getElementById('btnSolve').disabled = false;
+  setStatus('', 'Ready');
+  setActiveCell(-1, -1);
+}
+
+function setPreset(val) {
+  document.getElementById('clueInput').value = val;
+}
+
+function updateSpeed() {
+  const v = document.getElementById('speedSlider').value;
+  delay = 101 - v; // invert: high slider = fast = low delay
+  document.getElementById('speedValue').textContent = `${delay}ms`;
+}
+
+// ====== INIT ======
+buildGridDOM();
+buildSkyline();
+updateSpeed();
+</script>
+</body>
+</html>
